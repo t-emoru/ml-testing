@@ -1,4 +1,5 @@
 using LinearAlgebra
+using plots
 
 function out_prod(x,y)
     z = x*transpose(y)
