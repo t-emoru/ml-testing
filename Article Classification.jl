@@ -1,26 +1,6 @@
-using Pkg
-Pkg.add("HTTP")
-Pkg.add("Gumbo")
-Pkg.add("AbstractTrees")
-Pkg.add("ReadableRegex")
-Pkg.add("Cascadia")
-Pkg.add("DataFrames")
-Pkg.add("CSV")
-
-using HTTP, Gumbo
-using HTTP.Cookies
-using AbstractTrees
-using ReadableRegex
-using Cascadia
-using DataFrames
-using CSV
-
-
-
-############################################################### PART 1: Finding URLs
 
 "
-Function:
+Algorithm Function:
 
     ##LOW RISK [Good]
 
@@ -59,6 +39,31 @@ Function:
 "
 
 
+using Pkg
+Pkg.add("HTTP")
+Pkg.add("Gumbo")
+Pkg.add("AbstractTrees")
+Pkg.add("ReadableRegex")
+Pkg.add("Cascadia")
+Pkg.add("DataFrames")
+Pkg.add("CSV")
+
+
+using HTTP, Gumbo
+using HTTP.Cookies
+using AbstractTrees
+using ReadableRegex
+using Cascadia
+using DataFrames
+using CSV
+\
+
+#-------------------------------------------------------------------------------
+#Function Library
+#-------------------------------------------------------------------------------
+
+
+############################################################### PART 1: Search
 
 
 
@@ -88,11 +93,11 @@ function google_search(query)
 end
 
 
-function url_extract(body)
+function extraction_url(body)
 
     "
     Function: extraxts url from html content
-    Return: Clean Urls [contain names of companies to be traded]
+    Return: Clean Urls
     
     potentional refinement: import beautifulsoup4 python functions using
     https://gist.github.com/genkuroki/c26f22d3a06a69f917fc98bb07c5c90c
@@ -174,34 +179,21 @@ function url_extract(body)
 end
 
 
+# #LOGIN Functionality ?
+# login_username = []
+# login_password = []
 
-############################################################### PART 2:  Utilising URLs
-"
-Function: 
-Now that we have names of companies/commodities, search for news regrading
-them.
-.
-
-    1. Request URL Access
-    2. Extract & Package Information
-    3. Train Model
-    4. Inquire Amount of Article Traffic
-
-"
-
-
-#LOGIN Functionality
-login_username = []
-login_password = []
-
-
-#COMMENT "DONE" FUNCTIONS
 
 function request_access(urls, link)
+    "
+    Function: request to access html data of link
+    Returns: Status (1 meaning Yes) and Response (contains html data)
+    "
+
 
     subject = urls[link]
-
     response = HTTP.request("GET", subject)
+
 
     #check is request was successful
     if HTTP.status(response) == 200
@@ -210,22 +202,28 @@ function request_access(urls, link)
         println("Failed to access the website. Status code: ", HTTP.status(response))
     end
 
-    return status, response
 
+    return status, response
 end
 
 
 
+############################################################### PART 2:  Data Extraction
+
+
+
 function extraction(status, response)
+
+    "Change to return sentences?"
+
+
 
     title_list = []
     body_list = []
     table_list = []
 
     if status == 1
-        global title_list
-        global body_list
-        global table_list
+
 
         html_content = String(HTTP.body(response))
 
@@ -290,7 +288,17 @@ function extraction(status, response)
         end
 
 
-        "still need cleaning up and reformating before usage :/ "
+        "still need cleaning up and reformating before usage :/ 
+        Remaining Functionality:
+
+        1) Delete Empty Lists
+        2) Reformat data into clean rows and columns
+        3) Delete tables that do not have financial data?
+            i) Identification?? Machine Learning or Manual Checking
+
+        
+
+        "
 
 
 
@@ -300,10 +308,11 @@ function extraction(status, response)
 
     return title_list, body_list, table_list
 end
+# extraction_words - returns words of title & body
+# extraction_sentences - returns sentences of title & body
 
 
-
-function commodity_extraction(urls)
+function company_list()
     "
     Funtion: 
         Version 1 - 
@@ -312,52 +321,138 @@ function commodity_extraction(urls)
             Verfity strings are actually companies
             If Yes, push to commodities list
 
-        
+        This serves to create a master list of the companies in rank
+
+        from body Information create list of companies in the order they appear
     
     "
 
 end
 
-
-
-#-------------------------------------------------------------------------------
-
-
-# Getting Link
-query = "stock markets most profitable companies"
-
-search_data_raw = google_search(query)
-search_data_parsed = parsehtml(String(search_data_raw))
-
-body = search_data_parsed.root[2]
-urls = url_extract(body)
+# Master ranking function: produces a aggregrate of companies from combining all table data
 
 
 
-#Using Link
-status, response = request_access(urls, 3)
-title_list, body_list, tables = extraction(status, response)
-
-
-
-#-------------------------------------------------------------------------------
+# Inquire Amount of Article Traffic
 
 
 
 
+############################################################### PART 3: Data Utilization 
 
-############################################################### PART 3: Developing & Utilsing Models
-"Function:
+"Sentiment Functions:
+
+    The Sentiment Functions should have the ability to train a model and detect the
+    sentiment of the given data set, classifying it as Positive, Negative or Neutral
+
+        1: Build Model
+        2: Train Model and Determine Accuracy
+
+            # The process above will be rountinely repeated making adjustments
+              for incorrect predictions till set accuracy is achielved 
+
+        3: Predict Sentiment of Title and Body with Model
+    
 
 
 "
 
 
 
-###Training Model -Sentiment Analysis
+# Model 1 - Words Sentiment
 
-# Model 1 - Detecting Postive Words
+function sentiment_words()
+    #
+
+end
 
 
-# Model 2 - Detecting positive phrases/simple sentence [that indicate potential business benefit]
+# Model 2 - Sentence Senitment
+
+function sentiment_sentence()
+    #
+
+end
+
+
+
+function sentiment()
+    "applies all sentiment functions to the body & title then produces a final judgment"
+
+end
+
+
+
+
+
+
+
+
+################################################################################
+#-------------------------------------------------------------------------------
+# TESTING STAGES
+#-------------------------------------------------------------------------------
+################################################################################
+
+
+
+## 1. Initial Search for Companies
+query = "stock markets most profitable companies"
+
+### - Obtain Search Result URLS
+search_data_raw = google_search(query)
+search_data_parsed = parsehtml(String(search_data_raw))
+body = search_data_parsed.root[2]
+
+urls = extraction_url(body)
+
+
+### - Obtain List of Companies
+status, response = request_access(urls, 3)
+
+title_list, body_list, tables = extraction(status, response)
+vscodedisplay(tables[1])
+
+
+
+
+
+"from list of companies..."
+
+
+
+
+## 2. Initial Search for News on Company 1...
+"Search and Extract Article Coverage and Social Media Coverage
+Pull Financial Data from set sources 
+Pull past stock Information from set sources
+"
+
+# ~ARTICLE COVERAGE~
+
+### - Obtain Search Result URLS
+### - Obtain Sentiment About Company from each article
+
+
+# ~SOCIAL MEDIA COVERAGE~
+
+### - Obtain API Result 
+### - Obtain Sentiment About Company from each article
+
+
+# ~FINANCIAL DATA~
+
+### - Obtain Data from Source
+### - Obtain Sentiment/Financial Analysis 
+
+
+# ~PREVIOUS STOCK ACTIVITY~
+
+### - Obtain Activity from Source
+### - Obtain Volitility Rating (and other data) from Analysis
+
+
+
+
+#-------------------------------------------------------------------------------
 
