@@ -218,9 +218,15 @@ function extraction(status, response)
 
 
 
-    title_list = []
-    body_list = []
+    title_sentence = []
+    title_word = []
+
+    body_sentence = []
+    body_word = []
+
     table_list = []
+    df_list = []
+
 
     if status == 1
 
@@ -231,36 +237,57 @@ function extraction(status, response)
         parsed_article = parsehtml(html_content)
 
 
+
         ## Finidng words of Title
-        title_list = []
+        title_sentence = []
+        title_word = []
         title_element = eachmatch(Selector("title"), parsed_article.root)
 
+        # Words: Split the text into words using whitespace
         for element in title_element
-            title = split(text(element), r"\s+") # Split the text into words using whitespace
-            append!(title_list, title)
+            title = split(text(element), r"\s+")
+            append!(title_word, title)
         end
 
+        # Sentences: Split the text into words using whitespace
+        for element in title_element
+            title = split(text(element), r"\.")
+            append!(title_sentence, title)
+        end
 
 
 
         ## Finding words of Body
-        body_list = []
+        body_sentence = []
+        body_word = []
         body_elements = eachmatch(Selector("p"), parsed_article.root)
 
+        # Words: Split the text into words using whitespace
         for element in body_elements
             body = split(text(element), r"\s+") # Split the text into words using whitespace
-            append!(body_list, body)
+            append!(body_word, body)
+        end
+
+        # Sentences: Split the text into words using whitespace
+        for element in body_elements
+            title = split(text(element), r"\.")  # Split the text at full stops
+            append!(body_sentence, title)
         end
 
 
 
 
+        #-----------------------------------------------------------------------------
+        # EXTRACTING TABLES
+        #-----------------------------------------------------------------------------
 
-        ## Finding Tables & other Data points
+
+        ## Finding Tables
         body = parsed_article.root[2]
         table_data_raw = eachmatch(sel"table", body) #returns table data. NOW CLEAN !!
 
 
+        #Formatting Rows & Colums
         ntables = length(table_data_raw)
         table_list = []
 
@@ -288,17 +315,17 @@ function extraction(status, response)
         end
 
 
-        "still need cleaning up and reformating before usage :/ 
-        Remaining Functionality:
+        # Creating DataFrame
+        for i in range(1, length(table_list))
+            table_list[i] = [x for x in table_list[i] if x ≠ []] #removes empty indexes
 
-        1) Delete Empty Lists
-        2) Reformat data into clean rows and columns
-        3) Delete tables that do not have financial data?
-            i) Identification?? Machine Learning or Manual Checking
+            df = DataFrame(table_list[i], :auto)
+            df = permutedims(df)
 
-        
+            vscodedisplay(df)
 
-        "
+            push!(df_list, df)
+        end
 
 
 
@@ -306,17 +333,22 @@ function extraction(status, response)
         println("Access Denied")
     end
 
-    return title_list, body_list, table_list
+    title_data = [title_word, title_sentence]
+    body_data = [body_word, body_sentence]
+
+    return title_data, body_data, table_list
+
 end
-# extraction_words - returns words of title & body
-# extraction_sentences - returns sentences of title & body
+
+
+
 
 
 function company_list()
     "
     Funtion: 
-        Version 1 - 
-    
+        Delete tables that do not have company names
+
         1) From the first column of companies from data extraction
             Verfity strings are actually companies
             If Yes, push to commodities list
@@ -382,7 +414,9 @@ function sentiment()
 end
 
 
-
+function do_nothing()
+    #
+end
 
 
 
@@ -405,16 +439,33 @@ search_data_parsed = parsehtml(String(search_data_raw))
 body = search_data_parsed.root[2]
 
 urls = extraction_url(body)
+"Add: 
+    Try other method of extracting url    
+
+    feature that removes duplicate urls
+    urls that require login
+    urls that produce a negative login 
+
+    more pages of the search engine
+    
+"
 
 
 ### - Obtain List of Companies
-status, response = request_access(urls, 3)
+status, response = request_access(urls, 15)
+title_data, body_data, tables = extraction(status, response)
+"Add:
 
-title_list, body_list, tables = extraction(status, response)
-vscodedisplay(tables[1])
+    Create list of companies to compare too***
+
+    if no table data --> if no 'table of content'   -->  
+    if not scan through body data for company names 
 
 
+    Chekc if first column contains company name --> if not delete
+    if contains company name --> Create ranking in 1st column & push names to 2nd
 
+"
 
 
 "from list of companies..."
@@ -429,6 +480,7 @@ Pull past stock Information from set sources
 "
 
 # ~ARTICLE COVERAGE~
+query = "#company1 news"
 
 ### - Obtain Search Result URLS
 ### - Obtain Sentiment About Company from each article
@@ -455,4 +507,3 @@ Pull past stock Information from set sources
 
 
 #-------------------------------------------------------------------------------
-
