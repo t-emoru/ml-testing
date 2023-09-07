@@ -93,96 +93,6 @@ function google_search(query)
 end
 
 
-function extraction_url(body)
-
-    "
-    Function: extraxts url from html content
-    Return: Clean Urls
-    
-    potentional refinement: import beautifulsoup4 python functions using
-    https://gist.github.com/genkuroki/c26f22d3a06a69f917fc98bb07c5c90c
-    "
-
-
-    #URL Types
-    raw_URLs = []
-    dirty_URLs = []
-    clean_URLs = []
-    filtered_urls = []
-    url_pattern = r"(https?://[^&]+)" # Pattern for cleaning urls
-
-
-    # Acquiring "Dirty" & "raw" URLs
-    " 
-    Optimize: try using the built in 'eachmatch' function
-    "
-    for elem in PreOrderDFS(body)
-
-        try
-            # println(tag(elem))  -  creates tree
-            if tag(elem) == :a
-                push!(raw_URLs, elem)
-                #println(elem)
-
-                href = getattr(elem, "href")
-                push!(dirty_URLs, href)
-
-            end
-
-        catch
-            println("")
-        end
-
-
-    end
-
-
-
-    # Acquiring "Clean" URLs
-    for urls in dirty_URLs
-        matches = eachmatch(url_pattern, urls)
-
-        if !isempty(matches)
-            url = first(matches).match
-            push!(clean_URLs, url)
-        else
-            println("No URL found in the input string.")
-        end
-
-    end
-
-
-
-    ## Filtering Useless Clean URLs
-    "If it contains 'google' or doesn't equal 200"
-
-    for str in clean_URLs
-
-        if !occursin("google", str)
-
-            try
-                if HTTP.status(HTTP.request("GET", str)) == 200
-                    push!(filtered_urls, str)
-
-                end
-
-            catch
-                println("Can not access site")
-            end
-
-        end
-    end
-
-    return filtered_urls
-
-
-end
-
-
-# #LOGIN Functionality ?
-# login_username = []
-# login_password = []
-
 
 function request_access(urls, link)
     "
@@ -336,15 +246,104 @@ function extraction(status, response)
     title_data = [title_word, title_sentence]
     body_data = [body_word, body_sentence]
 
-    return title_data, body_data, table_list
+    return title_data, body_data, df_list
 
 end
 
 
+function extraction_url(body)
+
+    "
+    Function: extraxts url from html content
+    Return: Clean Urls
+    
+    potentional refinement: import beautifulsoup4 python functions using
+    https://gist.github.com/genkuroki/c26f22d3a06a69f917fc98bb07c5c90c
+    "
+
+
+    #URL Types
+    raw_URLs = []
+    dirty_URLs = []
+    clean_URLs = []
+    filtered_urls = []
+    url_pattern = r"(https?://[^&]+)" # Pattern for cleaning urls
+
+
+    # Acquiring "Dirty" & "raw" URLs
+    " 
+    Optimize: try using the built in 'eachmatch' function
+    "
+    for elem in PreOrderDFS(body)
+
+        try
+            # println(tag(elem))  -  creates tree
+            if tag(elem) == :a
+                push!(raw_URLs, elem)
+                #println(elem)
+
+                href = getattr(elem, "href")
+                push!(dirty_URLs, href)
+
+            end
+
+        catch
+            println("")
+        end
+
+
+    end
 
 
 
-function company_list()
+    # Acquiring "Clean" URLs
+    for urls in dirty_URLs
+        matches = eachmatch(url_pattern, urls)
+
+        if !isempty(matches)
+            url = first(matches).match
+            push!(clean_URLs, url)
+        else
+            println("No URL found in the input string.")
+        end
+
+    end
+
+
+
+    ## Filtering Useless Clean URLs
+    "If it contains 'google' or doesn't equal 200"
+
+    for str in clean_URLs
+
+        if !occursin("google", str)
+
+            try
+                if HTTP.status(HTTP.request("GET", str)) == 200
+                    push!(filtered_urls, str)
+
+                end
+
+            catch
+                println("Can not access site")
+            end
+
+        end
+    end
+
+    return filtered_urls
+
+
+end
+
+
+# #LOGIN Functionality ?
+# login_username = []
+# login_password = []
+
+
+
+function extraction_company(tables, body_data)
     "
     Funtion: 
         Delete tables that do not have company names
@@ -352,20 +351,117 @@ function company_list()
         1) From the first column of companies from data extraction
             Verfity strings are actually companies
             If Yes, push to commodities list
+            Only take first 4 letters of “company name”
 
         This serves to create a master list of the companies in rank
 
-        from body Information create list of companies in the order they appear
-    
+
     "
+
+    rankings_list = []
+
+    # Extract Company Names from body if NO Table
+    if length(tables) == 0
+
+        found_companies = []
+        for target in body_data[1]
+            if target in commodities
+                target = lowercase(target)
+                push!(found_companies, target)
+            end
+        end
+
+
+        push!(rankings_list, found_companies)
+
+    end
+
+
+    # Extract Company Names from Table
+    if length(tables) != 0
+
+        for i in range(1, length(tables))
+
+            columns_to_keep = []
+            data = tables[i]
+
+            column_names = names(tables[i])
+
+            for column in column_names
+                if any(item -> item in commodities, data[!, column])
+                    data[!, column] = [lowercase(s) for s in data[!, column]]
+
+                    push!(columns_to_keep, data[!, column])
+                end
+
+            end
+
+            push!(rankings_list, columns_to_keep)
+
+        end
+
+    end
+
+
+    # Master Ranking
+
+
+    return rankings_list
 
 end
 
-# Master ranking function: produces a aggregrate of companies from combining all table data
+function company_rank(rankings)
+    #
+    "from body Information create list of companies in the order they appear
+    Count the number of occurrences of a certain company name 
+    Rank all number 1s first then arrange number 1 based on occurrence 
+    Then repeat for every rank checking
+    make sure there are no repetitions"
+
+
+    # -----------------------------------------------------------------------------
+    # Number of Occurrences per String
+    # -----------------------------------------------------------------------------
+
+    # Create an empty dictionary to store counts
+    record = Dict{String,Int}()
+
+    # Loop through the nested lists and count occurrences
+    for sublist in rankings
+
+        flattened_list = vcat(sublist...)
+
+        for item in flattened_list
+            if haskey(record, item)
+
+                record[item] += 1
+
+            else
+                record[item] = 1
+            end
+        end
+    end
+
+
+    # -----------------------------------------------------------------------------
+    # Webiste Rankings
+    # -----------------------------------------------------------------------------
+
+
+
+
+    # -----------------------------------------------------------------------------
+    # Final Evaluation
+    # -----------------------------------------------------------------------------
+
+
+
+end
 
 
 
 # Inquire Amount of Article Traffic
+# Inquire Article Creation Day
 
 
 
@@ -440,20 +536,23 @@ body = search_data_parsed.root[2]
 
 urls = extraction_url(body)
 "Add: 
-    Try other method of extracting url    
+    Try other method of extracting url***  
 
     feature that removes duplicate urls
     urls that require login
     urls that produce a negative login 
 
     more pages of the search engine
+
+    remove urls that return 404 message
     
 "
 
 
 ### - Obtain List of Companies
-status, response = request_access(urls, 15)
+status, response = request_access(urls, 2)
 title_data, body_data, tables = extraction(status, response)
+rankings = extraction_company(tables, body_data)
 "Add:
 
     Create list of companies to compare too***
@@ -465,10 +564,54 @@ title_data, body_data, tables = extraction(status, response)
     Chekc if first column contains company name --> if not delete
     if contains company name --> Create ranking in 1st column & push names to 2nd
 
+
+
 "
 
+println(rankings)
 
 "from list of companies..."
+commodities = ["APPLE", "Apple",
+    "Microsoft Corporation",
+    "Amazon.com",
+    "Alphabet",
+    "Facebook",
+    "Tesla",
+    "Berkshire Hathaway",
+    "Johnson & Johnson",
+    "JPMorgan Chase",
+    "Procter & Gamble",
+    "Visa",
+    "Walmart",
+    "Mastercard Incorporated",
+    "UnitedHealth Group Incorporated",
+    "Home Depot",
+    "Verizon Communications",
+    "Coca-Cola Company",
+    "Adobe",
+    "NVIDIA Corporation",
+    "Pfizer",
+    "Walt Disney Company",
+    "McDonald's Corporation",
+    "Netflix",
+    "AT&T",
+    "Salesforce",
+    "PayPal Holdings",
+    "ASML Holding N.V.",
+    "Cisco Systems",
+    "Comcast Corporation",
+    "PepsiCo",
+    "Intel Corporation",
+    "Costco Wholesale Corporation",
+    "Amgen",
+    "Zoom Video Communications",
+    "Charter Communications",
+    "Starbucks Corporation",
+    "Baidu",
+    "Broadcom",
+    "Milk", "Coca", "Sugar", "Sugar"
+]
+"Include more company name variations"
 
 
 
@@ -507,3 +650,9 @@ query = "#company1 news"
 
 
 #-------------------------------------------------------------------------------
+
+# Creating Master Rankings
+
+
+
+
